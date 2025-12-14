@@ -41,3 +41,23 @@ Git Module: Git.pull().commit("Fix bug")
 Docker Module: Docker.build("app:latest")
 
 🚫 Non-POSIX Freedom: Orbit is not constrained by POSIX compatibility, allowing us to build a streamlined, safe, and internally consistent environment from the ground up.
+
+💻 A Simple Spaceship Example
+
+'''Orbit
+check {
+    # Clone repository and switch to a feature branch using the native Git module
+    Git.clone("repo_url", "local_dir").checkout("feature/build-update")
+
+    # Build the Docker image, piping the result to a custom build function
+    Docker.build("app:latest").then(Deploy.validate)
+
+    # Use native collections and control flow
+    for (i: range(10)) {
+        Log.info("Running iteration #" + i.toString())
+    }
+} except (e: GitError) {
+    Log.error("Git failed: " + e.message)
+    Process("notify-user", ["Build failed due to Git issues"])
+}
+'''
