@@ -44,8 +44,7 @@ Docker Module: Docker.build("app:latest")
 
 💻 A Simple Spaceship Example
 
-'''Orbit
-# An exaple
+`````Orbit
 check {
     # Clone repository and switch to a feature branch using the native Git module
     Git.clone("repo_url", "local_dir").checkout("feature/build-update")
@@ -61,4 +60,4 @@ check {
     Log.error("Git failed: " + e.message)
     Process("notify-user", ["Build failed due to Git issues"])
 }
-'''
+`````
