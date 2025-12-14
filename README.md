@@ -45,6 +45,7 @@ Docker Module: Docker.build("app:latest")
 💻 A Simple Spaceship Example
 
 '''Orbit
+# An exaple
 check {
     # Clone repository and switch to a feature branch using the native Git module
     Git.clone("repo_url", "local_dir").checkout("feature/build-update")
