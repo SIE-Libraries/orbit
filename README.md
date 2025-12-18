@@ -88,3 +88,75 @@ This allows developers to leverage existing shell scripts while benefiting from 
 ## Standard Library
 
 The primary standard library for Spaceship is the JIT-compiled POSIX layer. This ensures that all file I/O, process management, and other system-level operations are as fast and efficient as possible.
+
+## Usage Examples
+
+### Variable and Constant Declaration
+
+```go
+// Declare a mutable 32-bit integer
+var loopCounter i32 = 0
+
+// Declare a constant byte array (string)
+const GREETING u8[] = "Hello, Spaceship!"
+```
+
+### Function Definition and Error Handling
+
+This example defines a function that attempts to open a file and returns an `!i32` error contract. It is then called within a `check/except` block.
+
+```go
+// Definition for a function that can fail
+fn open_or_fail(path u8[]) !i32 {
+    // ... low-level POSIX call to open the file ...
+    // Returns a file descriptor (i32) on success or an error code on failure.
+}
+
+fn main() {
+    check {
+        // Attempt to open the file. If it fails, execution jumps to the except block.
+        var file_descriptor = open_or_fail("/etc/hosts")
+
+        // ... do something with the file_descriptor ...
+
+    } except {
+        // The 'err' variable is implicitly available and holds the i32 error code.
+        Posix.write(stdout, "Failed to open file with error code: " + err)
+    }
+}
+```
+
+### Process Pipelines
+
+Spaceship can construct and execute complex command pipelines with a clear, fluent syntax. Execution is deferred until the `.run()` method is called.
+
+```go
+// Find all .log files in the current directory, count the lines of each,
+// sort the results numerically, and get the top 5.
+// No processes are started during this setup.
+var pipeline = Process("find", [".", "-name", "*.log"])
+    .then(Process("xargs", ["wc", "-l"]))
+    .then(Process("sort", ["-n"]))
+    .then(Process("tail", ["-n", "5"]))
+
+// Execute the entire pipeline and get the final result.
+var top_five_logs = pipeline.run()
+
+Posix.write(stdout, top_five_logs)
+```
+
+## Performance & Benchmarks
+
+The primary goal of Spaceship is to provide a significant performance improvement over traditional, interpreted shell scripting languages like Bash. By using a JIT-compiler with LLVM, we aim to execute common systems administration and automation tasks an order of magnitude faster.
+
+### Hypothetical Benchmark
+
+The following benchmark is **hypothetical** and serves to illustrate the performance goals of the project. The task is to count the total number of lines in all `.log` files within a large directory structure.
+
+| Language / Method        | Time (seconds) | Performance Multiplier | Notes                                           |
+|--------------------------|----------------|------------------------|-------------------------------------------------|
+| `bash` (find + xargs + wc) | ~12.5s         | 1x (Baseline)          | High process creation overhead.                 |
+| `python` (os.walk)         | ~7.8s          | ~1.6x                  | Faster, but still interpreted.                  |
+| **`Spaceship`** (Goal)     | **~0.9s**      | **~14x**               | JIT-compiled native code with minimal overhead. |
+
+This theoretical benchmark highlights the advantages of avoiding interpreter overhead and leveraging direct, compiled POSIX calls for process management and I/O.
