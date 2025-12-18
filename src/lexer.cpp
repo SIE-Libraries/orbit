@@ -1,17 +1,41 @@
 #include "lexer.h"
-#include <iostream>
 #include <cctype>
+#include <unordered_map>
 
-namespace orbit {
+namespace spaceship {
 
-Lexer::Lexer(const std::string& source) : m_source(source), m_cursor(0) {}
+// Mapping from keyword strings to Token enums
+const std::unordered_map<std::string, Token> KEYWORDS = {
+    {"var", TOK_VAR},
+    {"fn", TOK_FN},
+    {"const", TOK_CONST},
+    {"check", TOK_CHECK},
+    {"except", TOK_EXCEPT},
+    {"i1", TOK_TYPE_I1},
+    {"i8", TOK_TYPE_I8},
+    {"i16", TOK_TYPE_I16},
+    {"i23", TOK_TYPE_I23},
+    {"i32", TOK_TYPE_I32},
+    {"i64", TOK_TYPE_I64},
+    {"i128", TOK_TYPE_I128},
+    {"f32", TOK_TYPE_F32},
+    {"f64", TOK_TYPE_F64},
+};
 
-std::vector<std::pair<Token, std::string>> Lexer::tokenize() {
-    std::vector<std::pair<Token, std::string>> tokens;
+Lexer::Lexer(const std::string& source)
+    : m_source(source), m_cursor(0), m_line(1), m_col_start(0) {}
+
+std::vector<TokenInfo> Lexer::tokenize() {
+    std::vector<TokenInfo> tokens;
     while (m_cursor < m_source.length()) {
         char currentChar = m_source[m_cursor];
+        int currentCol = m_cursor - m_col_start + 1;
 
         if (isspace(currentChar)) {
+            if (currentChar == '\n') {
+                m_line++;
+                m_col_start = m_cursor + 1;
+            }
             m_cursor++;
             continue;
         }
@@ -23,11 +47,19 @@ std::vector<std::pair<Token, std::string>> Lexer::tokenize() {
                 m_cursor++;
             }
 
-            if (identifier == "if") tokens.push_back({TOK_IF, "if"});
-            else if (identifier == "for") tokens.push_back({TOK_FOR, "for"});
-            else if (identifier == "check") tokens.push_back({TOK_CHECK, "check"});
-            else if (identifier == "except") tokens.push_back({TOK_EXCEPT, "except"});
-            else tokens.push_back({TOK_IDENTIFIER, identifier});
+            // Check for u8[] type
+            if (identifier == "u8" && m_cursor + 1 < m_source.length() && m_source[m_cursor] == '[' && m_source[m_cursor+1] == ']') {
+                tokens.push_back({TOK_TYPE_U8_ARRAY, "u8[]", m_line, currentCol});
+                m_cursor += 2; // Consume []
+                continue;
+            }
+
+            auto it = KEYWORDS.find(identifier);
+            if (it != KEYWORDS.end()) {
+                tokens.push_back({it->second, identifier, m_line, currentCol});
+            } else {
+                tokens.push_back({TOK_IDENTIFIER, identifier, m_line, currentCol});
+            }
             continue;
         }
 
@@ -37,7 +69,7 @@ std::vector<std::pair<Token, std::string>> Lexer::tokenize() {
                 number += m_source[m_cursor];
                 m_cursor++;
             }
-            tokens.push_back({TOK_LITERAL_INTEGER, number});
+            tokens.push_back({TOK_LITERAL_INTEGER, number, m_line, currentCol});
             continue;
         }
 
@@ -49,39 +81,36 @@ std::vector<std::pair<Token, std::string>> Lexer::tokenize() {
                 m_cursor++;
             }
             m_cursor++; // Skip closing quote
-            tokens.push_back({TOK_LITERAL_STRING, str});
+            tokens.push_back({TOK_LITERAL_STRING, str, m_line, currentCol});
             continue;
         }
 
-        if (currentChar == '.') {
-            if (m_cursor + 4 < m_source.length() && m_source.substr(m_cursor, 5) == ".then") {
-                tokens.push_back({TOK_THEN, ".then"});
-                m_cursor += 5;
-            } else {
-                tokens.push_back({TOK_DOT, "."});
-                m_cursor++;
-            }
-            continue;
-        }
-
-        switch (currentChar) {
-            case '(': tokens.push_back({TOK_LPAREN, "("}); break;
-            case ')': tokens.push_back({TOK_RPAREN, ")"}); break;
-            case '{': tokens.push_back({TOK_LBRACE, "{"}); break;
-            case '}': tokens.push_back({TOK_RBRACE, "}"}); break;
-            case ',': tokens.push_back({TOK_COMMA, ","}); break;
-            case ':': tokens.push_back({TOK_COLON, ":"}); break;
-            case '[': tokens.push_back({TOK_LBRACKET, "["}); break;
-            case ']': tokens.push_back({TOK_RBRACKET, "]"}); break;
-            default:
-                // Handle unknown characters or errors
-                m_cursor++;
+        if (currentChar == '@') {
+            if (m_cursor + 3 < m_source.length() && m_source.substr(m_cursor + 1, 3) == "jit") {
+                tokens.push_back({TOK_AT_JIT, "@jit", m_line, currentCol});
+                m_cursor += 4;
                 continue;
+            }
         }
+
+        Token tokenType = TOK_UNKNOWN;
+        switch (currentChar) {
+            case '(': tokenType = TOK_LPAREN; break;
+            case ')': tokenType = TOK_RPAREN; break;
+            case '{': tokenType = TOK_LBRACE; break;
+            case '}': tokenType = TOK_RBRACE; break;
+            case '[': tokenType = TOK_LBRACKET; break;
+            case ']': tokenType = TOK_RBRACKET; break;
+            case ',': tokenType = TOK_COMMA; break;
+            case '.': tokenType = TOK_DOT; break;
+            case '!': tokenType = TOK_BANG; break;
+        }
+
+        tokens.push_back({tokenType, std::string(1, currentChar), m_line, currentCol});
         m_cursor++;
     }
-    tokens.push_back({TOK_EOF, ""});
+    tokens.push_back({TOK_EOF, "", m_line, m_cursor - m_col_start + 1});
     return tokens;
 }
 
-}
+} // namespace spaceship
