@@ -11,10 +11,10 @@ const std::unordered_map<std::string, Token> KEYWORDS = {
     {"const", TOK_CONST},
     {"check", TOK_CHECK},
     {"except", TOK_EXCEPT},
+    {"map", TOK_MAP},
     {"i1", TOK_TYPE_I1},
     {"i8", TOK_TYPE_I8},
     {"i16", TOK_TYPE_I16},
-    {"i23", TOK_TYPE_I23},
     {"i32", TOK_TYPE_I32},
     {"i64", TOK_TYPE_I64},
     {"i128", TOK_TYPE_I128},
@@ -51,6 +51,12 @@ std::vector<TokenInfo> Lexer::tokenize() {
             if (identifier == "u8" && m_cursor + 1 < m_source.length() && m_source[m_cursor] == '[' && m_source[m_cursor+1] == ']') {
                 tokens.push_back({TOK_TYPE_U8_ARRAY, "u8[]", m_line, currentCol});
                 m_cursor += 2; // Consume []
+                continue;
+            }
+
+            // Check for i<N> pattern for arbitrary-width integers
+            if (identifier.rfind("i", 0) == 0 && identifier.length() > 1 && isdigit(identifier[1])) {
+                tokens.push_back({TOK_TYPE_I32, identifier, m_line, currentCol}); // Using I32 as a placeholder
                 continue;
             }
 

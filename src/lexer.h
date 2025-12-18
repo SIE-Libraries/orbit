@@ -22,18 +22,18 @@ enum Token {
   TOK_CONST = -8, // const
   TOK_CHECK = -9, // check
   TOK_EXCEPT = -10, // except
+  TOK_MAP = -11,    // map
 
   // Types
   TOK_TYPE_I1 = -20,
   TOK_TYPE_I8 = -21,
   TOK_TYPE_I16 = -22,
-  TOK_TYPE_I23 = -23, // Arbitrary bit-width example
-  TOK_TYPE_I32 = -24,
-  TOK_TYPE_I64 = -25,
-  TOK_TYPE_I128 = -26,
-  TOK_TYPE_F32 = -27,
-  TOK_TYPE_F64 = -28,
-  TOK_TYPE_U8_ARRAY = -29, // u8[]
+  TOK_TYPE_I32 = -23,
+  TOK_TYPE_I64 = -24,
+  TOK_TYPE_I128 = -25,
+  TOK_TYPE_F32 = -26,
+  TOK_TYPE_F64 = -27,
+  TOK_TYPE_U8_ARRAY = -28, // u8[]
 
   // Directives
   TOK_AT_JIT = -30, // @jit

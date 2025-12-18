@@ -30,6 +30,7 @@ class StatementNode : public ASTNode {};
 
 /// TypeNode - Represents a type in the language, e.g., i32, f64, u8[].
 class TypeNode : public ASTNode {
+protected:
   std::string TypeName;
   // In a full implementation, this would store detailed type info,
   // such as bit-width for arbitrary precision integers.
@@ -37,6 +38,39 @@ public:
   TypeNode(const std::string& typeName) : TypeName(typeName) {}
   llvm::Value *CodeGen(Compiler& compiler) override;
   const std::string& getTypeName() const { return TypeName; }
+};
+
+/// ArrayTypeNode - Represents an array type, e.g., [8]i32.
+class ArrayTypeNode : public TypeNode {
+  int Size;
+  std::unique_ptr<TypeNode> ElementType;
+
+public:
+  ArrayTypeNode(int size, std::unique_ptr<TypeNode> elementType)
+      : TypeNode("array"), Size(size), ElementType(std::move(elementType)) {}
+  llvm::Value* CodeGen(Compiler& compiler) override;
+};
+
+/// MapTypeNode - Represents a map type, e.g., map[u8[]]i32.
+class MapTypeNode : public TypeNode {
+  std::unique_ptr<TypeNode> KeyType;
+  std::unique_ptr<TypeNode> ValueType;
+
+public:
+  MapTypeNode(std::unique_ptr<TypeNode> keyType, std::unique_ptr<TypeNode> valueType)
+      : TypeNode("map"), KeyType(std::move(keyType)), ValueType(std::move(valueType)) {}
+  llvm::Value* CodeGen(Compiler& compiler) override;
+};
+
+/// IndexAccessNode - Expression for accessing an array or map element, e.g., my_array[i].
+class IndexAccessNode : public ExpressionNode {
+  std::unique_ptr<ExpressionNode> Aggregate;
+  std::unique_ptr<ExpressionNode> Index;
+
+public:
+  IndexAccessNode(std::unique_ptr<ExpressionNode> aggregate, std::unique_ptr<ExpressionNode> index)
+      : Aggregate(std::move(aggregate)), Index(std::move(index)) {}
+  llvm::Value* CodeGen(Compiler& compiler) override;
 };
 
 /// IntegerLiteralNode - Expression for numeric literals.

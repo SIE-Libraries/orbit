@@ -5,7 +5,7 @@ Spaceship is a high-performance systems automation language designed to replace 
 ## Core Principles
 
 - **Performance:** Statically typed and JIT-compiled for maximum execution speed.
-- **Security:** Eliminates shell injection vulnerabilities through a strict `Process` API.
+- **Security:** Eliminates shell injection vulnerabilities through a strict `Process` API powered by direct OS-level syscalls.
 - **Reliability:** A clear, explicit error handling model based on POSIX exit codes.
 - **Modern Syntax:** A clean, Go-inspired syntax that is easy to read and write.
 
@@ -15,18 +15,14 @@ Spaceship uses a strict, fixed-width type system. There is no type inference; al
 
 ### Type Table
 
-| Type      | Description                                       | Notes                                                     |
-|-----------|---------------------------------------------------|-----------------------------------------------------------|
-| `i1`      | Boolean type                                      | Represents `true` (1) or `false` (0).                     |
-| `i8`      | 8-bit signed integer                              |                                                           |
-| `i16`     | 16-bit signed integer                             |                                                           |
-| `i23`     | 23-bit signed integer (example)                   | Supports arbitrary bit-widths for specialized use cases.  |
-| `i32`     | 32-bit signed integer                             |                                                           |
-| `i64`     | 64-bit signed integer                             |                                                           |
-| `i128`    | 128-bit signed integer                            |                                                           |
-| `f32`     | 32-bit floating-point number                      |                                                           |
-| `f64`     | 64-bit floating-point number                      |                                                           |
-| `u8[]`    | Raw byte array (string)                           | Zero-copy compatible with POSIX file descriptors.         |
+| Type             | Description                                       | Syntax Example                                  |
+|------------------|---------------------------------------------------|-------------------------------------------------|
+| `i1`             | Boolean type                                      | `var is_active i1 = true`                       |
+| `i8` - `i128`    | Fixed-width signed integers                       | `var user_id i64`                               |
+| `f32`, `f64`     | Floating-point numbers                            | `const PI f64 = 3.14159`                        |
+| `u8[]`           | Raw byte array (string)                           | `var message u8[] = "hello"`                    |
+| `[<size>]<type>` | Fixed-size array                                  | `var buffer [1024]i8`                           |
+| `map[<k>]<v>`    | Hash map                                          | `var scores map[u8[]]i32`                       |
 
 ## Error Handling: The `!i32` Contract
 
@@ -52,9 +48,11 @@ check {
 
 ## Execution and Pipeline Model
 
-### Secure Process Execution
+### Secure Process Execution with the `Syscalls` Library
 
-All external commands are executed using the `Process` API, which interfaces directly with `execve`. This is a critical security feature that prevents shell injection vulnerabilities by design.
+All external commands are executed using the `Process` API. This API is powered by a backend `Syscalls` runtime library that interfaces directly with the host operating system's process creation APIs (e.g., `fork`/`execve` on Linux/macOS, `CreateProcess` on Windows).
+
+This is a critical security feature that prevents shell injection vulnerabilities by design, as arguments are passed as a structured array, not a raw string to be parsed by a shell.
 
 **Example:** `Process("ls", ["-l", "/home/user"])`
 
@@ -78,32 +76,29 @@ The `@jit` directive is a powerful compiler feature that translates shell script
 
 **Example:** `@jit("deploy.sh")`
 
-When the compiler encounters this directive, it will:
-1. Read and parse the `deploy.sh` script.
-2. Translate the shell commands into an equivalent series of `Process` calls and POSIX operations.
-3. JIT-compile the translated logic into highly optimized machine code.
-
 This allows developers to leverage existing shell scripts while benefiting from the performance and security of the Spaceship runtime.
 
 ## Standard Library
 
-The primary standard library for Spaceship is the JIT-compiled POSIX layer. This ensures that all file I/O, process management, and other system-level operations are as fast and efficient as possible.
+The primary standard library for Spaceship is the JIT-compiled POSIX layer, along with the `Syscalls` runtime library. This ensures that all file I/O, process management, and other system-level operations are as fast and efficient as possible.
 
 ## Usage Examples
 
-### Variable and Constant Declaration
+### Data Structures
 
 ```go
-// Declare a mutable 32-bit integer
-var loopCounter i32 = 0
+// Declare a fixed-size array of 4 64-bit integers
+var vector [4]i64
 
-// Declare a constant byte array (string)
-const GREETING u8[] = "Hello, Spaceship!"
+// Declare a map with string keys and 32-bit integer values
+var user_ages map[u8[]]i32
+
+// Accessing an element (syntax)
+vector[2] = 100
+user_ages["jules"] = 32
 ```
 
 ### Function Definition and Error Handling
-
-This example defines a function that attempts to open a file and returns an `!i32` error contract. It is then called within a `check/except` block.
 
 ```go
 // Definition for a function that can fail
@@ -114,11 +109,7 @@ fn open_or_fail(path u8[]) !i32 {
 
 fn main() {
     check {
-        // Attempt to open the file. If it fails, execution jumps to the except block.
         var file_descriptor = open_or_fail("/etc/hosts")
-
-        // ... do something with the file_descriptor ...
-
     } except {
         // The 'err' variable is implicitly available and holds the i32 error code.
         Posix.write(stdout, "Failed to open file with error code: " + err)
@@ -128,18 +119,14 @@ fn main() {
 
 ### Process Pipelines
 
-Spaceship can construct and execute complex command pipelines with a clear, fluent syntax. Execution is deferred until the `.run()` method is called.
-
 ```go
-// Find all .log files in the current directory, count the lines of each,
-// sort the results numerically, and get the top 5.
-// No processes are started during this setup.
+// Find all .log files, count their lines, sort numerically, and get the top 5.
 var pipeline = Process("find", [".", "-name", "*.log"])
     .then(Process("xargs", ["wc", "-l"]))
     .then(Process("sort", ["-n"]))
     .then(Process("tail", ["-n", "5"]))
 
-// Execute the entire pipeline and get the final result.
+// Execute the entire pipeline.
 var top_five_logs = pipeline.run()
 
 Posix.write(stdout, top_five_logs)

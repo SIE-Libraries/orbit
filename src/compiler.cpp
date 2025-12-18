@@ -34,6 +34,11 @@ llvm::Value* TypeNode::CodeGen(Compiler& compiler) {
 // Helper function to get the LLVM type from a TypeNode.
 // This is where the core logic of the Type System Codegen resides.
 llvm::Type* getLLVMType(TypeNode& typeNode, llvm::LLVMContext& context) {
+    if (auto* arrayTypeNode = dynamic_cast<ArrayTypeNode*>(&typeNode)) {
+        llvm::Type* elementType = getLLVMType(*arrayTypeNode->ElementType, context);
+        return llvm::ArrayType::get(elementType, arrayTypeNode->Size);
+    }
+
     const std::string& typeName = typeNode.getTypeName();
 
     if (typeName == "i1") return llvm::Type::getInt1Ty(context);
@@ -115,8 +120,7 @@ llvm::Value* FnDeclNode::CodeGen(Compiler& compiler) {
     // 1. Create the function prototype.
     std::vector<llvm::Type*> argTypes;
     for (const auto& arg : Args) {
-        // This is a simplification. In a real compiler, we'd get the type from the VarDeclNode.
-        // argTypes.push_back(getLLVMType(*arg->VarType, compiler.getContext()));
+        argTypes.push_back(getLLVMType(*arg->VarType, compiler.getContext()));
     }
 
     llvm::Type* returnType = ReturnType ? getLLVMType(*ReturnType, compiler.getContext()) : llvm::Type::getVoidTy(compiler.getContext());
@@ -127,12 +131,15 @@ llvm::Value* FnDeclNode::CodeGen(Compiler& compiler) {
     llvm::BasicBlock* basicBlock = llvm::BasicBlock::Create(compiler.getContext(), "entry", function);
     compiler.getBuilder().SetInsertPoint(basicBlock);
 
-    // 3. Set up arguments in the symbol table. (Simplified)
+    // 3. Set up arguments in the symbol table.
     compiler.NamedValues.clear();
     for (auto& arg : function->args()) {
-        // In a real implementation, we would create allocas for the args
-        // and store their values, to make them mutable.
-        // compiler.NamedValues[arg.getName()] = &arg;
+        // Create an alloca for each argument.
+        llvm::AllocaInst* alloca = compiler.getBuilder().CreateAlloca(arg.getType(), nullptr, arg.getName());
+        // Store the initial value into the alloca.
+        compiler.getBuilder().CreateStore(&arg, alloca);
+        // Add arguments to the symbol table.
+        compiler.NamedValues[arg.getName()] = alloca;
     }
 
     // 4. Generate code for each statement in the Body.
@@ -156,11 +163,52 @@ llvm::Value* FnDeclNode::CodeGen(Compiler& compiler) {
 }
 
 llvm::Value* ProcessCallNode::CodeGen(Compiler& compiler) {
-  // TODO: Implement secure process call.
-  // This will generate a call to a unified backend function (e.g., a C function
-  // linked into the JIT) that takes the command and arguments and uses execve.
-  // This is a critical security feature.
-  return nullptr;
+    // 1. Get the function prototype for spaceship_run_process.
+    llvm::Function* calleeF = compiler.getModule().getFunction("spaceship_run_process");
+    if (!calleeF) {
+        // Create the prototype: int spaceship_run_process(const char*, char* const*)
+        llvm::Type* intType = llvm::Type::getInt32Ty(compiler.getContext());
+        llvm::Type* strType = llvm::Type::getInt8PtrTy(compiler.getContext());
+        llvm::Type* strArrType = llvm::Type::getInt8PtrTy(compiler.getContext())->getPointerTo();
+
+        std::vector<llvm::Type*> argTypes = {strType, strArrType};
+        llvm::FunctionType* funcType = llvm::FunctionType::get(intType, argTypes, false);
+
+        calleeF = llvm::Function::Create(
+            funcType, llvm::Function::ExternalLinkage, "spaceship_run_process", &compiler.getModule());
+    }
+
+    // 2. Prepare the arguments.
+    // The first argument is the command itself.
+    llvm::Value* commandStr = compiler.getBuilder().CreateGlobalStringPtr(Command, "command");
+
+    // The second argument is a null-terminated array of C-style strings.
+    std::vector<llvm::Value*> argsV;
+    // The first element of the args array for execve is conventionally the program name.
+    argsV.push_back(compiler.getBuilder().CreateGlobalStringPtr(Command, "arg0"));
+    for (const auto& arg : Args) {
+        // In a real implementation, we would need to ensure the expression
+        // results in a u8[] (char*).
+        argsV.push_back(arg->CodeGen(compiler));
+    }
+    // Add the null terminator.
+    argsV.push_back(llvm::ConstantPointerNull::get(llvm::Type::getInt8PtrTy(compiler.getContext())));
+
+    // Create the array on the stack.
+    llvm::ArrayType* arrayType = llvm::ArrayType::get(llvm::Type::getInt8PtrTy(compiler.getContext()), argsV.size());
+    llvm::Value* argsArray = compiler.getBuilder().CreateAlloca(arrayType, nullptr, "args_array");
+
+    for (size_t i = 0; i < argsV.size(); ++i) {
+        llvm::Value* index = llvm::ConstantInt::get(llvm::Type::getInt64Ty(compiler.getContext()), i);
+        llvm::Value* ptr = compiler.getBuilder().CreateGEP(arrayType, argsArray, {llvm::ConstantInt::get(llvm::Type::getInt64Ty(compiler.getContext()), 0), index});
+        compiler.getBuilder().CreateStore(argsV[i], ptr);
+    }
+
+    // Decay the array pointer to a pointer to its first element to match the function signature.
+    llvm::Value* argsPtr = compiler.getBuilder().CreateBitCast(argsArray, llvm::Type::getInt8PtrTy(compiler.getContext())->getPointerTo());
+
+    // 3. Create the call instruction.
+    return compiler.getBuilder().CreateCall(calleeF, {commandStr, argsPtr});
 }
 
 llvm::Value* PipelineNode::CodeGen(Compiler& compiler) {
@@ -188,6 +236,24 @@ llvm::Value* CheckExceptNode::CodeGen(Compiler& compiler) {
   // clauses. The code will need to check the return value of functions
   // with the !i32 contract and jump to the 'except' block on failure.
   return nullptr;
+}
+
+llvm::Value* ArrayTypeNode::CodeGen(Compiler& compiler) {
+    // This node is handled by the getLLVMType helper function.
+    return nullptr;
+}
+
+llvm::Value* MapTypeNode::CodeGen(Compiler& compiler) {
+    // TODO: Implement map type codegen. This will likely involve
+    // creating a struct or using an external library to represent the map.
+    return nullptr;
+}
+
+llvm::Value* IndexAccessNode::CodeGen(Compiler& compiler) {
+    // TODO: Implement array and map access.
+    // For arrays, this will generate a GetElementPtr (GEP) instruction.
+    // For maps, this will generate a call to a map lookup function.
+    return nullptr;
 }
 
 } // namespace spaceship
