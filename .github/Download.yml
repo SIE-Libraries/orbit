@@ -1,0 +1,92 @@
+name: Spaceship Compiler Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*' # Trigger on version tags (e.g., v1.0.0)
+  workflow_dispatch: # Allow manual triggering for testing
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Spaceship Compiler (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            artifact_name: spaceship-linux
+          - os: macos-latest
+            artifact_name: spaceship-macos
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install LLVM (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y llvm-dev libclang-dev clang
+
+      - name: Install LLVM (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install llvm
+          echo "LDFLAGS=-L$(brew --prefix llvm)/lib" >> $GITHUB_ENV
+          echo "CPPFLAGS=-I$(brew --prefix llvm)/include" >> $GITHUB_ENV
+          echo "/usr/local/opt/llvm/bin" >> $GITHUB_PATH
+
+      - name: Compile Spaceship Parser
+        run: |
+          # Use llvm-config to get correct flags for the C++ compiler
+          g++ src/*.cpp -o ${{ matrix.artifact_name }} \
+          $(llvm-config --cxxflags --ldflags --libs --system-libs) \
+          -O3 -std=c++17
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_name }}
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Download Linux Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: spaceship-linux
+
+      - name: Download MacOS Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: spaceship-macos
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            spaceship-linux
+            spaceship-macos
+          body: |
+            ## Spaceship Compiler Release
+            
+            ### Features included:
+            - **C++ Native Parser:** Go-inspired syntax parsing.
+            - **LLVM JIT Backend:** Direct machine code generation.
+            - **POSIX JIT:** Unified system call execution.
+            - **@jit Directive:** Support for compiling `.sh` scripts to native binary.
+            
+            ### Installation:
+            Download the binary for your OS and add it to your PATH.
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
