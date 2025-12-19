@@ -147,3 +147,4 @@ The following benchmark is **hypothetical** and serves to illustrate the perform
 | **`Spaceship`** (Goal)     | **~0.9s**      | **~14x**               | JIT-compiled native code with minimal overhead. |
 
 This theoretical benchmark highlights the advantages of avoiding interpreter overhead and leveraging direct, compiled POSIX calls for process management and I/O.
+Note : The *standard library* is *still under development* .
