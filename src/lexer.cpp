@@ -6,13 +6,14 @@ namespace spaceship {
 
 // Mapping from keyword strings to Token enums
 const std::unordered_map<std::string, Token> KEYWORDS = {
-    {"var", TOK_VAR},
+    {"let", TOK_LET},
+    {"mut", TOK_MUT},
     {"fn", TOK_FN},
     {"const", TOK_CONST},
     {"check", TOK_CHECK},
     {"except", TOK_EXCEPT},
-    {"map", TOK_MAP},
-    {"i1", TOK_TYPE_I1},
+    {"HashMap", TOK_HASHMAP},
+    {"bool", TOK_TYPE_BOOL},
     {"i8", TOK_TYPE_I8},
     {"i16", TOK_TYPE_I16},
     {"i32", TOK_TYPE_I32},
@@ -47,10 +48,10 @@ std::vector<TokenInfo> Lexer::tokenize() {
                 m_cursor++;
             }
 
-            // Check for u8[] type
-            if (identifier == "u8" && m_cursor + 1 < m_source.length() && m_source[m_cursor] == '[' && m_source[m_cursor+1] == ']') {
-                tokens.push_back({TOK_TYPE_U8_ARRAY, "u8[]", m_line, currentCol});
-                m_cursor += 2; // Consume []
+            // Check for jit!
+            if (identifier == "jit" && m_cursor < m_source.length() && m_source[m_cursor] == '!') {
+                tokens.push_back({TOK_JIT_BANG, "jit!", m_line, currentCol});
+                m_cursor++;
                 continue;
             }
 
@@ -91,12 +92,16 @@ std::vector<TokenInfo> Lexer::tokenize() {
             continue;
         }
 
-        if (currentChar == '@') {
-            if (m_cursor + 3 < m_source.length() && m_source.substr(m_cursor + 1, 3) == "jit") {
-                tokens.push_back({TOK_AT_JIT, "@jit", m_line, currentCol});
-                m_cursor += 4;
-                continue;
-            }
+        if (currentChar == '[' && m_cursor + 3 < m_source.length() && m_source.substr(m_cursor + 1, 3) == "u8]") {
+            tokens.push_back({TOK_TYPE_U8_ARRAY, "[u8]", m_line, currentCol});
+            m_cursor += 4;
+            continue;
+        }
+
+        if (currentChar == '-' && m_cursor + 1 < m_source.length() && m_source[m_cursor + 1] == '>') {
+            tokens.push_back({TOK_ARROW, "->", m_line, currentCol});
+            m_cursor += 2;
+            continue;
         }
 
         Token tokenType = TOK_UNKNOWN;
@@ -110,6 +115,8 @@ std::vector<TokenInfo> Lexer::tokenize() {
             case ',': tokenType = TOK_COMMA; break;
             case '.': tokenType = TOK_DOT; break;
             case '!': tokenType = TOK_BANG; break;
+            case ':': tokenType = TOK_COLON; break;
+            case ';': tokenType = TOK_SEMICOLON; break;
         }
 
         tokens.push_back({tokenType, std::string(1, currentChar), m_line, currentCol});

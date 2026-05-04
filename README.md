@@ -1,13 +1,13 @@
 # Spaceship Language Specification
 
-Spaceship is a high-performance systems automation language designed to replace legacy shell scripting. It features a strict, Go-inspired syntax, a powerful fixed-width type system, and a novel JIT (Just-In-Time) compilation model for POSIX commands, all built on top of LLVM.
+Spaceship is a high-performance systems automation language designed to replace legacy shell scripting. It features a strict, Rust-inspired syntax, a powerful fixed-width type system, and a novel JIT (Just-In-Time) compilation model for POSIX commands, all built on top of LLVM.
 
 ## Core Principles
 
 - **Performance:** Statically typed and JIT-compiled for maximum execution speed.
 - **Security:** Eliminates shell injection vulnerabilities through a strict `Process` API powered by direct OS-level syscalls.
 - **Reliability:** A clear, explicit error handling model based on POSIX exit codes.
-- **Modern Syntax:** A clean, Go-inspired syntax that is easy to read and write.
+- **Modern Syntax:** A clean, Rust-inspired syntax that is easy to read and write.
 
 ## Type System
 
@@ -17,32 +17,32 @@ Spaceship uses a strict, fixed-width type system. There is no type inference; al
 
 | Type             | Description                                       | Syntax Example                                  |
 |------------------|---------------------------------------------------|-------------------------------------------------|
-| `i1`             | Boolean type                                      | `var is_active i1 = true`                       |
-| `i8` - `i128`    | Fixed-width signed integers                       | `var user_id i64`                               |
-| `f32`, `f64`     | Floating-point numbers                            | `const PI f64 = 3.14159`                        |
-| `u8[]`           | Raw byte array (string)                           | `var message u8[] = "hello"`                    |
-| `[<size>]<type>` | Fixed-size array                                  | `var buffer [1024]i8`                           |
-| `map[<k>]<v>`    | Hash map                                          | `var scores map[u8[]]i32`                       |
+| `bool`           | Boolean type                                      | `let is_active: bool = true;`                   |
+| `i8` - `i128`    | Fixed-width signed integers                       | `let user_id: i64;`                             |
+| `f32`, `f64`     | Floating-point numbers                            | `const PI: f64 = 3.14159;`                      |
+| `[u8]`           | Raw byte array (string)                           | `let message: [u8] = "hello";`                  |
+| `[<type>; <size>]` | Fixed-size array                               | `let buffer: [i8; 1024];`                       |
+| `HashMap<K, V>`  | Hash map                                          | `let scores: HashMap<[u8], i32>;`               |
 
 ## Error Handling: The `!i32` Contract
 
 Spaceship uses an explicit error handling mechanism that maps directly to POSIX exit codes and `errno`. Any function that can fail must declare its return type with a `!` prefix, indicating that it returns an error contract.
 
-**Example:** `fn readFile(path u8[]) !i32`
+**Example:** `fn readFile(path: [u8]) -> !i32`
 
 - On success, the function returns a non-zero value.
 - On failure, it returns a standard POSIX error code (e.g., `ENOENT` for "No such file or directory").
 
 This contract is enforced by the `check {} except {}` block.
 
-```go
+```rust
 check {
     // Code that might fail
-    var fd = readFile("my_file.txt")
+    let fd: i32 = readFile("my_file.txt");
 } except {
     // This block executes if readFile() returns an error code
     // The error code is implicitly available in the `err` variable
-    Posix.write(stdout, "Error reading file: " + err)
+    Posix.write(stdout, "Error reading file: " + err);
 }
 ```
 
@@ -61,20 +61,24 @@ This is a critical security feature that prevents shell injection vulnerabilitie
 Spaceship uses a deferred execution model for command pipelines, inspired by fluent APIs. Operations are chained together using `.then()`, but no execution occurs until `.run()` is called.
 
 **Example:**
-```go
-var pipeline = Process("grep", ["-r", "keyword", "."])
-    .then(Process("wc", ["-l"]))
+```rust
+let pipeline = Process("grep", ["-r", "keyword", "."])
+    .then(Process("wc", ["-l"]));
 
 // Nothing has executed yet.
 
-var result = pipeline.run() // The pipeline is now executed.
+let result = pipeline.run(); // The pipeline is now executed.
 ```
 
-### The `@jit` Directive: Shell-to-Native Translation
+### The `jit!` Directive: Shell-to-Native Translation
 
-The `@jit` directive is a powerful compiler feature that translates shell scripts into native POSIX logic and JIT-compiles them directly into the LLVM execution path. This provides a significant performance and security advantage over traditional shell script execution.
+The `jit!` directive is a powerful compiler feature that translates shell scripts into native POSIX logic and JIT-compiles them directly into the LLVM execution path. This provides a significant performance and security advantage over traditional shell script execution.
 
-**Example:** `@jit("deploy.sh")`
+**Example:** `jit!("deploy.sh");`
+
+```rust
+jit!("deploy.sh");
+```
 
 This allows developers to leverage existing shell scripts while benefiting from the performance and security of the Spaceship runtime.
 
@@ -86,50 +90,50 @@ The primary standard library for Spaceship is the JIT-compiled POSIX layer, alon
 
 ### Data Structures
 
-```go
+```rust
 // Declare a fixed-size array of 4 64-bit integers
-var vector [4]i64
+let vector: [i64; 4];
 
 // Declare a map with string keys and 32-bit integer values
-var user_ages map[u8[]]i32
+let user_ages: HashMap<[u8], i32>;
 
 // Accessing an element (syntax)
-vector[2] = 100
-user_ages["jules"] = 32
+vector[2] = 100;
+user_ages["jules"] = 32;
 ```
 
 ### Function Definition and Error Handling
 
-```go
+```rust
 // Definition for a function that can fail
-fn open_or_fail(path u8[]) !i32 {
+fn open_or_fail(path: [u8]) -> !i32 {
     // ... low-level POSIX call to open the file ...
     // Returns a file descriptor (i32) on success or an error code on failure.
 }
 
 fn main() {
     check {
-        var file_descriptor = open_or_fail("/etc/hosts")
+        let file_descriptor: i32 = open_or_fail("/etc/hosts");
     } except {
         // The 'err' variable is implicitly available and holds the i32 error code.
-        Posix.write(stdout, "Failed to open file with error code: " + err)
+        Posix.write(stdout, "Failed to open file with error code: " + err);
     }
 }
 ```
 
 ### Process Pipelines
 
-```go
+```rust
 // Find all .log files, count their lines, sort numerically, and get the top 5.
-var pipeline = Process("find", [".", "-name", "*.log"])
+let pipeline = Process("find", [".", "-name", "*.log"])
     .then(Process("xargs", ["wc", "-l"]))
     .then(Process("sort", ["-n"]))
-    .then(Process("tail", ["-n", "5"]))
+    .then(Process("tail", ["-n", "5"]));
 
 // Execute the entire pipeline.
-var top_five_logs = pipeline.run()
+let top_five_logs: [u8] = pipeline.run();
 
-Posix.write(stdout, top_five_logs)
+Posix.write(stdout, top_five_logs);
 ```
 
 ## Performance & Benchmarks

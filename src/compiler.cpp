@@ -41,7 +41,7 @@ llvm::Type* getLLVMType(TypeNode& typeNode, llvm::LLVMContext& context) {
 
     const std::string& typeName = typeNode.getTypeName();
 
-    if (typeName == "i1") return llvm::Type::getInt1Ty(context);
+    if (typeName == "bool") return llvm::Type::getInt1Ty(context);
     if (typeName == "i8") return llvm::Type::getInt8Ty(context);
     if (typeName == "i16") return llvm::Type::getInt16Ty(context);
     if (typeName == "i32") return llvm::Type::getInt32Ty(context);
@@ -50,9 +50,9 @@ llvm::Type* getLLVMType(TypeNode& typeNode, llvm::LLVMContext& context) {
     if (typeName == "f32") return llvm::Type::getFloatTy(context);
     if (typeName == "f64") return llvm::Type::getDoubleTy(context);
 
-    // Handle u8[] as a pointer to an 8-bit integer (char*).
-    if (typeName == "u8[]") {
-        return llvm::Type::getInt8PtrTy(context);
+    // Handle [u8] as a pointer to an 8-bit integer (char*).
+    if (typeName == "[u8]") {
+        return llvm::PointerType::getUnqual(context);
     }
 
     // Handle arbitrary-width integers, e.g., i23
@@ -78,7 +78,7 @@ llvm::Value* IntegerLiteralNode::CodeGen(Compiler& compiler) {
 }
 
 llvm::Value* StringLiteralNode::CodeGen(Compiler& compiler) {
-  // TODO: Create a global string pointer for the u8[] literal.
+  // TODO: Create a global string pointer for the [u8] literal.
   // This is the standard way to handle string literals in LLVM.
   return compiler.getBuilder().CreateGlobalStringPtr(Val, "str_literal");
 }
@@ -139,7 +139,7 @@ llvm::Value* FnDeclNode::CodeGen(Compiler& compiler) {
         // Store the initial value into the alloca.
         compiler.getBuilder().CreateStore(&arg, alloca);
         // Add arguments to the symbol table.
-        compiler.NamedValues[arg.getName()] = alloca;
+        compiler.NamedValues[std::string(arg.getName())] = alloca;
     }
 
     // 4. Generate code for each statement in the Body.
@@ -168,8 +168,8 @@ llvm::Value* ProcessCallNode::CodeGen(Compiler& compiler) {
     if (!calleeF) {
         // Create the prototype: int spaceship_run_process(const char*, char* const*)
         llvm::Type* intType = llvm::Type::getInt32Ty(compiler.getContext());
-        llvm::Type* strType = llvm::Type::getInt8PtrTy(compiler.getContext());
-        llvm::Type* strArrType = llvm::Type::getInt8PtrTy(compiler.getContext())->getPointerTo();
+        llvm::Type* strType = llvm::PointerType::getUnqual(compiler.getContext());
+        llvm::Type* strArrType = llvm::PointerType::getUnqual(compiler.getContext())->getPointerTo();
 
         std::vector<llvm::Type*> argTypes = {strType, strArrType};
         llvm::FunctionType* funcType = llvm::FunctionType::get(intType, argTypes, false);
@@ -188,14 +188,14 @@ llvm::Value* ProcessCallNode::CodeGen(Compiler& compiler) {
     argsV.push_back(compiler.getBuilder().CreateGlobalStringPtr(Command, "arg0"));
     for (const auto& arg : Args) {
         // In a real implementation, we would need to ensure the expression
-        // results in a u8[] (char*).
+        // results in a [u8] (char*).
         argsV.push_back(arg->CodeGen(compiler));
     }
     // Add the null terminator.
-    argsV.push_back(llvm::ConstantPointerNull::get(llvm::Type::getInt8PtrTy(compiler.getContext())));
+    argsV.push_back(llvm::ConstantPointerNull::get(llvm::PointerType::getUnqual(compiler.getContext())));
 
     // Create the array on the stack.
-    llvm::ArrayType* arrayType = llvm::ArrayType::get(llvm::Type::getInt8PtrTy(compiler.getContext()), argsV.size());
+    llvm::ArrayType* arrayType = llvm::ArrayType::get(llvm::PointerType::getUnqual(compiler.getContext()), argsV.size());
     llvm::Value* argsArray = compiler.getBuilder().CreateAlloca(arrayType, nullptr, "args_array");
 
     for (size_t i = 0; i < argsV.size(); ++i) {
@@ -205,7 +205,7 @@ llvm::Value* ProcessCallNode::CodeGen(Compiler& compiler) {
     }
 
     // Decay the array pointer to a pointer to its first element to match the function signature.
-    llvm::Value* argsPtr = compiler.getBuilder().CreateBitCast(argsArray, llvm::Type::getInt8PtrTy(compiler.getContext())->getPointerTo());
+    llvm::Value* argsPtr = compiler.getBuilder().CreateBitCast(argsArray, llvm::PointerType::getUnqual(compiler.getContext())->getPointerTo());
 
     // 3. Create the call instruction.
     return compiler.getBuilder().CreateCall(calleeF, {commandStr, argsPtr});

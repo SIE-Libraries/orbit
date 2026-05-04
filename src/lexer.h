@@ -14,18 +14,19 @@ enum Token {
   // Literals
   TOK_IDENTIFIER = -3,
   TOK_LITERAL_INTEGER = -4,
-  TOK_LITERAL_STRING = -5, // Represents u8[]
+  TOK_LITERAL_STRING = -5, // Represents [u8]
 
   // Keywords
-  TOK_VAR = -6,   // var
+  TOK_LET = -6,   // let
   TOK_FN = -7,    // fn
   TOK_CONST = -8, // const
   TOK_CHECK = -9, // check
   TOK_EXCEPT = -10, // except
-  TOK_MAP = -11,    // map
+  TOK_HASHMAP = -11, // HashMap
+  TOK_MUT = -12,     // mut
 
   // Types
-  TOK_TYPE_I1 = -20,
+  TOK_TYPE_BOOL = -20, // bool
   TOK_TYPE_I8 = -21,
   TOK_TYPE_I16 = -22,
   TOK_TYPE_I32 = -23,
@@ -33,10 +34,10 @@ enum Token {
   TOK_TYPE_I128 = -25,
   TOK_TYPE_F32 = -26,
   TOK_TYPE_F64 = -27,
-  TOK_TYPE_U8_ARRAY = -28, // u8[]
+  TOK_TYPE_U8_ARRAY = -28, // [u8]
 
   // Directives
-  TOK_AT_JIT = -30, // @jit
+  TOK_JIT_BANG = -30, // jit!
 
   // Operators & Punctuation
   TOK_LPAREN = '(',
@@ -48,6 +49,9 @@ enum Token {
   TOK_COMMA = ',',
   TOK_DOT = '.',
   TOK_BANG = '!', // For !i32 error contract
+  TOK_COLON = ':',
+  TOK_SEMICOLON = ';',
+  TOK_ARROW = -40, // ->
 };
 
 // Represents a single token produced by the lexer

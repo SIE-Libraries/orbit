@@ -28,7 +28,7 @@ class ExpressionNode : public ASTNode {};
 /// StatementNode - Base class for nodes that represent an action or declaration.
 class StatementNode : public ASTNode {};
 
-/// TypeNode - Represents a type in the language, e.g., i32, f64, u8[].
+/// TypeNode - Represents a type in the language, e.g., i32, f64, [u8].
 class TypeNode : public ASTNode {
 protected:
   std::string TypeName;
@@ -42,16 +42,16 @@ public:
 
 /// ArrayTypeNode - Represents an array type, e.g., [8]i32.
 class ArrayTypeNode : public TypeNode {
+public:
   int Size;
   std::unique_ptr<TypeNode> ElementType;
 
-public:
   ArrayTypeNode(int size, std::unique_ptr<TypeNode> elementType)
       : TypeNode("array"), Size(size), ElementType(std::move(elementType)) {}
   llvm::Value* CodeGen(Compiler& compiler) override;
 };
 
-/// MapTypeNode - Represents a map type, e.g., map[u8[]]i32.
+/// MapTypeNode - Represents a map type, e.g., HashMap<[u8], i32>.
 class MapTypeNode : public TypeNode {
   std::unique_ptr<TypeNode> KeyType;
   std::unique_ptr<TypeNode> ValueType;
@@ -81,7 +81,7 @@ public:
   llvm::Value *CodeGen(Compiler& compiler) override;
 };
 
-/// StringLiteralNode - Expression for string literals (u8[]).
+/// StringLiteralNode - Expression for string literals ([u8]).
 class StringLiteralNode : public ExpressionNode {
   std::string Val;
 public:
@@ -89,13 +89,13 @@ public:
   llvm::Value *CodeGen(Compiler& compiler) override;
 };
 
-/// VarDeclNode - Statement for a variable declaration, e.g., var x i32.
+/// VarDeclNode - Statement for a variable declaration, e.g., let x: i32.
 class VarDeclNode : public StatementNode {
+public:
   std::string VarName;
   std::unique_ptr<TypeNode> VarType;
   std::unique_ptr<ExpressionNode> InitialValue; // Optional initial value
 
-public:
   VarDeclNode(const std::string& varName, std::unique_ptr<TypeNode> varType, std::unique_ptr<ExpressionNode> initialValue = nullptr)
       : VarName(varName), VarType(std::move(varType)), InitialValue(std::move(initialValue)) {}
   llvm::Value *CodeGen(Compiler& compiler) override;
