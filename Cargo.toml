@@ -1,0 +1,20 @@
+[package]
+name = "spaceship"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+inkwell = { version = "0.5", features = ["llvm18-0"] }
+thiserror = "2.0"
+anyhow = "1.0"
+clap = { version = "4.5", features = ["derive"] }
+object = "0.36"
+regex = "1.10"
+
+[lib]
+name = "spaceship"
+path = "src/lib.rs"
+
+[[bin]]
+name = "spaceship"
+path = "src/main.rs"
