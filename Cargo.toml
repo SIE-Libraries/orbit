@@ -1,0 +1,16 @@
+[package]
+name = "orbit"
+version = "0.1.0"
+edition = "2021"
+authors = ["Orbit Contributors"]
+description = "Rust rewrite of the Orbit Spaceship compiler and runtime."
+license = "MIT OR Apache-2.0"
+publish = false
+
+[dependencies]
+inkwell = { version = "0.1.1", features = ["llvm15-0"] }
+anyhow = "1.0"
+libc = "0.2"
+
+[dev-dependencies]
+tempfile = "3.5"
