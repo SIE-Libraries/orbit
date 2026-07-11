@@ -80,7 +80,9 @@ impl Expression {
                     .as_pointer_value()
                     .into(),
             ),
-            Expression::ProcessCall { command, args } => {
+            Expression::ProcessCall { command, args: _args } => {
+                // TODO: Implement args processing when building full process call support
+                // For now, we're generating the basic function signature
                 let i32_type = compiler.context.i32_type();
                 let i8_ptr_type = compiler
                     .context
